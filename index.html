@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Free Stuff Near Me • Las Vegas</title>
+  <style>
+    :root { --bg:#0b0d12; --card:#131722; --text:#dfe6f1; --muted:#95a2b3; --accent:#06d6a0; }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    header{padding:24px 20px; text-align:center; border-bottom:1px solid #1c2230}
+    h1{margin:0 0 6px;font-size:28px}
+    .accent{color:var(--accent)}
+    .sub{color:var(--muted);margin:0}
+    .controls{display:flex; gap:12px; flex-wrap:wrap; padding:14px 20px; align-items:flex-end}
+    .controls label{display:flex; flex-direction:column; gap:6px; color:var(--muted)}
+    .controls input[type=text]{background:var(--card); border:1px solid #1e2432; color:var(--text); padding:10px 12px; border-radius:10px; min-width:120px}
+    .controls input[type=range]{width:180px}
+    .controls button{background:var(--accent); color:#00110a; border:0; padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer}
+    .sources{border:1px solid #1e2432; border-radius:12px; padding:8px 12px}
+    .sources label{display:inline-flex; align-items:center; gap:6px; margin-right:12px}
+    .auto{color:var(--muted)}
+    #results{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px; padding:10px 20px 40px}
+    .card{background:var(--card); border:1px solid #1e2432; border-radius:14px; overflow:hidden; display:flex; flex-direction:column}
+    .card img{width:100%; height:180px; object-fit:cover; background:#0a0a0a}
+    .card .body{padding:12px}
+    .card h3{margin:0 0 6px; font-size:18px}
+    .meta{display:flex; flex-wrap:wrap; gap:6px; color:var(--muted); font-size:13px}
+    .meta span{background:#0c1220; padding:4px 8px; border-radius:999px; border:1px solid #1c2230}
+    .card a{color:var(--accent); text-decoration:none}
+    footer{padding:10px 20px 30px; color:var(--muted); border-top:1px solid #1c2230}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Free Stuff Finder <span class="accent">Las Vegas</span></h1>
+    <p class="sub">Search within <strong>up to 100 miles</strong> and switch cities anytime.</p>
+  </header>
+
+  <section class="controls">
+    <label>ZIP
+      <input id="zip" type="text" placeholder="89101" value="89101">
+    </label>
+    <label>Radius (miles)
+      <input id="radius" type="range" min="5" max="100" step="5" value="35" oninput="radiusVal.textContent=this.value">
+      <span id="radiusVal">35</span>
+    </label>
+    <label>Query
+      <input id="query" type="text" placeholder="sofa, crib, pallets...">
+    </label>
+    <fieldset class="sources">
+      <legend>Sources</legend>
+      <label><input type="checkbox" value="craigslist" checked> Craigslist</label>
+      <label><input type="checkbox" value="trashnothing" checked> TrashNothing</label>
+      <label><input type="checkbox" value="offerup" checked> OfferUp*</label>
+    </fieldset>
+    <button id="searchBtn">Search</button>
+    <label class="auto"><input id="auto" type="checkbox"> Auto-refresh every 60s</label>
+  </section>
+
+  <section id="results"></section>
+
+  <footer>
+    <small>* OfferUp data via Apify actor (requires token on backend). Built by Neo for Bobby.</small>
+  </footer>
+
+  <script>
+    // ======= SET YOUR BACKEND URL HERE =======
+    // For local dev: 'http://localhost:8000'
+    // For production: your deployed FastAPI URL (Railway/Render/Fly)
+    const BACKEND_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+      ? 'http://localhost:8000'
+      : 'https://your-backend.example.com';
+    // =========================================
+
+    const resultsEl = document.getElementById('results');
+    const zipEl = document.getElementById('zip');
+    const radiusEl = document.getElementById('radius');
+    const queryEl = document.getElementById('query');
+    const autoEl = document.getElementById('auto');
+    const btn = document.getElementById('searchBtn');
+
+    let autoTimer = null;
+
+    function selectedSources() {
+      const checks = document.querySelectorAll('.sources input[type=checkbox]:checked');
+      return [...checks].map(c => c.value).join(',');
+    }
+
+    async function fetchListings() {
+      const params = new URLSearchParams({
+        zip: (zipEl.value || '').trim(),
+        radius_miles: radiusEl.value,
+        query: (queryEl.value || '').trim(),
+        sources: selectedSources()
+      });
+      const url = `${BACKEND_URL}/search?${params.toString()}`;
+      resultsEl.innerHTML = `<div class="card"><div class="body"><h3>Loading…</h3></div></div>`;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+        const data = await res.json();
+        renderCards(data);
+      } catch (e) {
+        resultsEl.innerHTML = `<div class="card"><div class="body"><h3>Failed to load</h3><p class="meta">${e}</p></div></div>`;
+      }
+    }
+
+    function renderCards(items) {
+      resultsEl.innerHTML = '';
+      if (!items.length) {
+        resultsEl.innerHTML = `<div class="card"><div class="body"><h3>No free items right now</h3><p class="meta">Try widening your radius or clearing filters.</p></div></div>`;
+        return;
+      }
+      for (const it of items) {
+        const card = document.createElement('article');
+        card.className = 'card';
+        const img = document.createElement('img');
+        img.src = it.image || 'https://picsum.photos/seed/freebie/600/400';
+        img.alt = it.title || 'Free item';
+        const body = document.createElement('div');
+        body.className = 'body';
+        const h3 = document.createElement('h3');
+        h3.textContent = it.title || 'Free item';
+        const desc = document.createElement('p');
+        desc.textContent = (it.description || '').slice(0, 180);
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        if (it.source) { const s = document.createElement('span'); s.textContent = it.source; meta.appendChild(s); }
+        if (it.location_name) { const s = document.createElement('span'); s.textContent = it.location_name; meta.appendChild(s); }
+        if (typeof it.distance_miles === 'number') { const s = document.createElement('span'); s.textContent = \`\${it.distance_miles.toFixed(1)} mi\`; meta.appendChild(s); }
+
+        const link = document.createElement('a');
+        link.href = it.url || '#';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = 'View →';
+
+        body.append(h3, desc, meta, link);
+        card.append(img, body);
+        resultsEl.append(card);
+      }
+    }
+
+    btn.addEventListener('click', fetchListings);
+    autoEl.addEventListener('change', () => {
+      if (autoEl.checked) {
+        fetchListings();
+        autoTimer = setInterval(fetchListings, 60000);
+      } else if (autoTimer) {
+        clearInterval(autoTimer);
+        autoTimer = null;
+      }
+    });
+
+    // initial load
+    fetchListings();
+  </script>
+</body>
+</html>
