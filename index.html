@@ -64,14 +64,15 @@
     <small>* OfferUp data via Apify actor (requires token on backend). Built by Neo for Bobby.</small>
   </footer>
 
-  <script>
-    // ======= SET YOUR BACKEND URL HERE =======
-    // For local dev: 'http://localhost:8000'
-    // For production: your deployed FastAPI URL (Railway/Render/Fly)
-    const BACKEND_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-      ? 'http://localhost:8000'
-      : 'https://your-backend.example.com';
-    // =========================================
+<script>
+  // ======= SET YOUR BACKEND URL HERE =======
+  // For local dev: 'http://localhost:8000'
+  // For production: your deployed FastAPI URL (Railway/Render/Fly)
+  const BACKEND_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? 'http://localhost:8000'
+    : 'https://web-production-37ed0.up.railway.app';
+  // =========================================
+</script>
 
     const resultsEl = document.getElementById('results');
     const zipEl = document.getElementById('zip');
